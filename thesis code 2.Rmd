@@ -1,0 +1,811 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+#IPUMSdata<-read.csv("/Downloads/usa_00002 (2).csv")
+data <- read.csv("cps_00002.csv")
+data
+```
+
+
+```{r}
+# Load required library
+library(dplyr)
+
+# First create the hispanic indicator
+data <- data %>%
+  mutate(
+    hispanic = case_when(
+      HISPAN == 0 ~ 0,  # Not Hispanic
+      HISPAN >= 100 ~ 1, # Hispanic
+      TRUE ~ NA_real_            # Handle any other values
+    )
+  )
+
+# Now we can create the ethgroup variable
+data <- data %>%
+  mutate(
+    ethgroup = case_when(
+      RACE == 100 & hispanic == 0 ~ 1,  # Non-Hispanic White
+      RACE == 200 & hispanic == 0 ~ 2,  # Non-Hispanic Black
+      RACE == 300 & hispanic == 0 ~ 3,  # Non-Hispanic Native American
+      RACE >= 650 & RACE <= 652 & hispanic == 0 ~ 4,  # Non-Hispanic Asian/PI
+      hispanic == 1 ~ 5,  # Hispanic (any race)
+      TRUE ~ 6  # Other/Multiple Races
+    )
+  )
+
+# Create individual dummy variables
+data <- data %>%
+  mutate(
+    white_nh = as.numeric(ethgroup == 1),
+    black_nh = as.numeric(ethgroup == 2),
+    aian_nh = as.numeric(ethgroup == 3),
+    asian_pi_nh = as.numeric(ethgroup == 4),
+    hispanic_any = as.numeric(ethgroup == 5),
+    other_race = as.numeric(ethgroup == 6)
+  )
+
+# Check the distribution
+summary_stats <- data %>%
+  summarise(
+    n_hispanic = sum(hispanic == 1, na.rm = TRUE),
+    n_non_hispanic = sum(hispanic == 0, na.rm = TRUE),
+    pct_hispanic = mean(hispanic == 1, na.rm = TRUE) * 100
+  )
+
+print(summary_stats)
+```
+```{r}
+# Create analysis variables
+
+
+data <- data %>%
+  mutate(
+    # Self-employed dummy (assuming class of worker indicates self-employment)
+    self_employed = as.numeric(CLASSWKR %in% c(10, 13)), # Adjust codes as needed
+    
+    # Female dummy
+    female = as.numeric(SEX == 2),
+    
+    # Time period dummy
+    after1988 = as.numeric(YEAR >= 1988),
+    
+    # Interaction term
+    female_after1988 = female * after1988,
+    
+    # Education categories (4 levels)
+    education_level = case_when(
+      EDUC < 73 ~ 1,  # Less than High School
+      EDUC == 73 ~ 2,  # High School Graduate
+      EDUC %in% c(80:90) ~ 3,  # Some College
+      EDUC >= 91 ~ 4,  # College Graduate or higher
+      TRUE ~ NA_real_
+    )
+  )
+
+# Create education dummy variables
+data <- data %>%
+  mutate(
+    ed_less_hs = as.numeric(education_level == 1),
+    ed_hs_grad = as.numeric(education_level == 2),
+    ed_some_college = as.numeric(education_level == 3),
+    ed_college_plus = as.numeric(education_level == 4)
+  )
+
+# Create age categories if needed
+data <- data %>%
+  mutate(
+    age_group = case_when(
+      AGE < 25 ~ 1,
+      AGE >= 25 & AGE < 35 ~ 2,
+      AGE >= 35 & AGE < 45 ~ 3,
+      AGE >= 45 & AGE < 55 ~ 4,
+      AGE >= 55 ~ 5,
+      TRUE ~ NA_real_
+    )
+  )
+
+# Add labels to education levels
+data <- data %>%
+  mutate(
+    education_level_factor = factor(education_level,
+      levels = 1:4,
+      labels = c(
+        "Less than High School",
+        "High School Graduate",
+        "Some College",
+        "College Graduate or higher"
+      )
+    )
+  )
+
+# Create a basic summary of the variables
+summary_stats <- data %>%
+  summarise(
+    n_total = n(),
+    pct_self_employed = mean(self_employed, na.rm = TRUE) * 100,
+    pct_female = mean(female, na.rm = TRUE) * 100,
+    avg_age = mean(AGE, na.rm = TRUE),
+    
+    # Education distribution
+    pct_less_hs = mean(ed_less_hs, na.rm = TRUE) * 100,
+    pct_hs_grad = mean(ed_hs_grad, na.rm = TRUE) * 100,
+    pct_some_college = mean(ed_some_college, na.rm = TRUE) * 100,
+    pct_college_plus = mean(ed_college_plus, na.rm = TRUE) * 100
+  )
+
+# Create a cross-tabulation of self-employment by gender and education
+crosstab <- data %>%
+  group_by(female, education_level_factor) %>%
+  summarise(
+    n_self_employed = sum(self_employed, na.rm = TRUE),
+    total = n(),
+    pct_self_employed = mean(self_employed, na.rm = TRUE) * 100,
+    .groups = 'drop'
+  )
+```
+```{r}
+# Load required library
+library(dplyr)
+
+# First create the hispanic indicator
+data <- data %>%
+  mutate(
+    hispanic = case_when(
+      HISPAN == 0 ~ 0,  # Not Hispanic
+      HISPAN >= 100 & HISPAN <= 612~ 1, # Hispanic
+      TRUE ~ NA_real_            # Handle any other values
+    )
+  )
+
+# Now we can create the ethgroup variable
+data <- data %>%
+  mutate(
+    ethgroup = case_when(
+      RACE == 100 & hispanic == 0 ~ 1,  # Non-Hispanic White
+      RACE == 200 & hispanic == 0 ~ 2,  # Non-Hispanic Black
+      RACE == 300 & hispanic == 0 ~ 3,  # Non-Hispanic American Indian
+      RACE >= 650 & RACE <= 652 & hispanic == 0 ~ 4,  # Non-Hispanic Asian/PI
+      hispanic == 1 ~ 5,  # Hispanic (any race)
+      TRUE ~ 6  # Other/Multiple Races
+    )
+  )
+
+# Create individual dummy variables
+data <- data %>%
+  mutate(
+    white_nh = as.numeric(ethgroup == 1),
+    black_nh = as.numeric(ethgroup == 2),
+    aian_nh = as.numeric(ethgroup == 3),
+    asian_pi_nh = as.numeric(ethgroup == 4),
+    hispanic_any = as.numeric(ethgroup == 5),
+    other_race = as.numeric(ethgroup == 6)
+  )
+
+# Check the distribution
+summary_stats <- data %>%
+  summarise(
+    n_hispanic = sum(hispanic == 1, na.rm = TRUE),
+    n_non_hispanic = sum(hispanic == 0, na.rm = TRUE),
+    pct_hispanic = mean(hispanic == 1, na.rm = TRUE) * 100
+  )
+
+print(summary_stats)
+```
+
+
+```{r}
+# Load required packages
+library(dplyr)
+library(sandwich)  # For robust standard errors
+library(lmtest)    # For coeftest
+library(AER)       # For IV regression
+library(stargazer) # For nice regression tables
+
+
+# Base Model - Simple DiD
+model1 <- lm(self_employed ~ female * after1988, data = data)
+model1
+```
+
+
+```{r}
+# Model 2 - Adding demographic controls
+model2 <- lm(self_employed ~ female * after1988 + 
+               education_level + 
+               AGE + I(AGE^2) +
+               MARST+
+               factor(ethgroup), 
+             data = data)
+model2
+```
+
+
+```{r}
+# Model 3 - Full specification with interactions
+model3 <- lm(self_employed ~ female * after1988 * factor(education_level) + 
+               AGE + I(AGE^2) +
+               MARST +
+               factor(ethgroup), 
+             data = data)
+model3
+```
+
+```{r}
+# Create credit access proxy variable
+data <- data %>%
+  mutate(
+    # Base credit access on education, age, and employment
+    credit_access = case_when(
+      education_level == 4 ~ 0.8,  # College+ (highest credit access)
+      education_level == 3 ~ 0.6,  # Some college
+      education_level == 2 ~ 0.4,  # High school
+      TRUE ~ 0.2  # Less than high school
+    ) +
+    # Age effect (normalized)
+    (AGE - min(AGE))/(max(AGE) - min(AGE))*0.2 +
+    # Time period effect
+    after1988 * 0.1 +
+    # Gender effect pre-1988 (reflecting potential discrimination)
+    (female * (!after1988)) * (-0.1) +
+    # Random variation
+    rnorm(n(), mean = 0, sd = 0.1)
+  ) %>%
+  # Ensure values stay between 0 and 1
+  mutate(credit_access = pmin(pmax(credit_access, 0), 1))
+```
+
+```{r}
+state_laws <- ifelse(data$after1988)
+```
+
+```{r}
+# Get robust standard errors for all models
+robust_se1 <- sqrt(diag(vcovHC(model1, type = "HC1")))
+robust_se2 <- sqrt(diag(vcovHC(model2, type = "HC1")))
+robust_se3 <- sqrt(diag(vcovHC(model3, type = "HC1")))
+```
+
+
+```{r}
+# Print results with robust standard errors
+stargazer(model1, model2, model3,
+          se = list(robust_se1, robust_se2, robust_se3),
+          title = "Impact of ECOA on Female Self-Employment",
+          type = "html",
+          digits = 3,
+          omit.stat = c("f", "ser"))
+```
+
+
+```{r}
+# IV Model Setup
+# First stage: Female credit access prediction
+first_stage <- lm(credit_access ~ female * after1988 + 
+                    education_level + AGE + I(AGE^2) + 
+                    factor(ethgroup),
+                  data = data)
+```
+
+
+```{r}
+# IV regression
+iv_model <- ivreg(self_employed ~ credit_access + female * after1988 + 
+                    education_level + AGE + I(AGE^2) + 
+                    factor(ethgroup) | 
+                    female * after1988 + 
+                    education_level + AGE + I(AGE^2) + 
+                    factor(ethgroup),
+                  data = data)
+```
+
+
+```{r}
+# Get IV robust standard errors
+iv_robust_se <- sqrt(diag(vcovHC(iv_model, type = "HC1")))
+
+# Print IV results
+summary(iv_model, vcov = sandwich, diagnostics = TRUE)
+```
+
+
+```{r}
+# Subgroup Analysis by Marital Status
+# Married subsample
+married_sample <- subset(data, MARST == 1)  
+model_married <- lm(self_employed ~ female * after1988 + 
+                     education_level + AGE + I(AGE^2) + 
+                     factor(ethgroup),
+                   data = married_sample)
+
+# Unmarried subsample
+unmarried_sample <- subset(data, MARST != 1)
+model_unmarried <- lm(self_employed ~ female * after1988 + 
+                       education_level + AGE + I(AGE^2) + 
+                       factor(ethgroup),
+                     data = unmarried_sample)
+```
+
+
+```{r}
+# Compare married vs unmarried results
+stargazer(model_married, model_unmarried,
+          se = list(sqrt(diag(vcovHC(model_married, type = "HC1"))),
+                   sqrt(diag(vcovHC(model_unmarried, type = "HC1")))),
+          title = "ECOA Impact by Marital Status",
+          type = "html",
+          digits = 3,
+          column.labels = c("Married", "Unmarried"),
+          omit.stat = c("f", "ser"))
+
+# this is the code that didn't format properly. the correct one is below 👇 
+```
+
+```{r}
+# Open a connection to save the HTML file
+html_file <- "ECOA_Impact_by_Marital_Status.html"
+
+# Write the stargazer output to the file
+sink(html_file)
+stargazer(model_married, model_unmarried,
+          se = list(sqrt(diag(vcovHC(model_married, type = "HC1"))),
+                    sqrt(diag(vcovHC(model_unmarried, type = "HC1")))),
+          title = "ECOA Impact by Marital Status",
+          type = "html",
+          digits = 3,
+          column.labels = c("Married", "Unmarried"),
+          omit.stat = c("f", "ser"))
+sink()  # Close the connection
+
+```
+
+```{r}
+# Additional robustness checks
+# 1. Different time windows
+model_5yr <- lm(self_employed ~ female * after1988 + 
+                  education_level + AGE + I(AGE^2) + 
+                  factor(ethgroup),
+                data = subset(data, abs(YEAR - 1988) <= 5))
+model_5yr
+```
+
+
+```{r}
+# 2. Placebo test (fake treatment year)
+data$fake_reform <- as.numeric(data$YEAR >= 1985)
+model_placebo <- lm(self_employed ~ female * fake_reform + 
+                     education_level + AGE + I(AGE^2) + 
+                     factor(ethgroup),
+                   data = subset(data, YEAR < 1988))
+```
+
+
+```{r}
+# Save results to a file
+sink("regression_results.html")
+stargazer(model1, model2, model3, model_married, model_unmarried,
+          se = list(robust_se1, robust_se2, robust_se3,
+                   sqrt(diag(vcovHC(model_married, type = "HC1"))),
+                   sqrt(diag(vcovHC(model_unmarried, type = "HC1")))),
+          title = "ECOA Impact on Female Self-Employment",
+          type = "html",
+          digits = 3)
+sink()
+```
+
+```{r}
+# Load required packages
+library(dplyr)
+library(stargazer)
+library(tidyr)
+library(knitr)
+
+# 1. Descriptive Statistics ----
+
+# Overall sample statistics
+desc_stats <- data %>%
+  summarise(
+    N = n(),
+    `Female (%)` = mean(female, na.rm = TRUE) * 100,
+    `Self-Employed (%)` = mean(self_employed, na.rm = TRUE) * 100,
+    `Age (Mean)` = mean(AGE, na.rm = TRUE),
+    `Age (SD)` = sd(AGE, na.rm = TRUE),
+    `Less than HS (%)` = mean(education_level == 1, na.rm = TRUE) * 100,
+    `HS Graduate (%)` = mean(education_level == 2, na.rm = TRUE) * 100,
+    `Some College (%)` = mean(education_level == 3, na.rm = TRUE) * 100,
+    `College+ (%)` = mean(education_level == 4, na.rm = TRUE) * 100
+  )
+```
+
+```{r}
+# First, let's create the basic table
+desc_stats <- data %>%
+  summarise(
+    N = n(),
+    `Female (%)` = mean(female, na.rm = TRUE) * 100,
+    `Self-Employed (%)` = mean(self_employed, na.rm = TRUE) * 100,
+    `Age (Mean)` = mean(AGE, na.rm = TRUE),
+    `Age (SD)` = sd(AGE, na.rm = TRUE),
+    `Less than HS (%)` = mean(education_level == 1, na.rm = TRUE) * 100,
+    `HS Graduate (%)` = mean(education_level == 2, na.rm = TRUE) * 100,
+    `Some College (%)` = mean(education_level == 3, na.rm = TRUE) * 100,
+    `College+ (%)` = mean(education_level == 4, na.rm = TRUE) * 100
+  )
+
+# Format the numbers to be more readable
+desc_stats_formatted <- desc_stats %>%
+  mutate(across(where(is.numeric), ~round(., 2)))
+```
+
+
+```{r}
+# If you have kableExtra installed:
+library(kableExtra)
+
+# Create a formatted table
+table_output <- desc_stats_formatted %>%
+  t() %>% # Transpose the table
+  as.data.frame() %>%
+  rownames_to_column("Variable") %>%
+  kbl(caption = "Descriptive Statistics",
+      col.names = c("Variable", "Value"),
+      align = c("l", "r")) %>%
+  kable_classic(full_width = FALSE)
+
+# Save to Word
+library(officer)
+library(flextable)
+
+# Convert to flextable for Word export
+ft <- desc_stats_formatted %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("Variable") %>%
+  flextable() %>%
+  set_caption("Descriptive Statistics") %>%
+  autofit()
+
+# Save to Word document
+doc <- read_docx()
+doc <- body_add_flextable(doc, ft)
+print(doc, target = "descriptive_statistics.docx")
+```
+
+```{r}
+# Statistics by gender
+desc_stats_by_gender <- data %>%
+  group_by(female) %>%
+  summarise(
+    N = n(),
+    `Self-Employed (%)` = mean(self_employed, na.rm = TRUE) * 100,
+    `Age (Mean)` = mean(AGE, na.rm = TRUE),
+    `Age (SD)` = sd(AGE, na.rm = TRUE),
+    `Less than HS (%)` = mean(education_level == 1, na.rm = TRUE) * 100,
+    `HS Graduate (%)` = mean(education_level == 2, na.rm = TRUE) * 100,
+    `Some College (%)` = mean(education_level == 3, na.rm = TRUE) * 100,
+    `College+ (%)` = mean(education_level == 4, na.rm = TRUE) * 100
+  ) %>%
+  mutate(Gender = if_else(female == 1, "Female", "Male")) %>%
+  select(Gender, everything(), -female)
+```
+
+
+```{r}
+# Statistics before and after 1988
+desc_stats_by_period <- data %>%
+  group_by(after1988) %>%
+  summarise(
+    N = n(),
+    `Female (%)` = mean(female, na.rm = TRUE) * 100,
+    `Self-Employed (%)` = mean(self_employed, na.rm = TRUE) * 100,
+    `Age (Mean)` = mean(AGE, na.rm = TRUE),
+    `Age (SD)` = sd(AGE, na.rm = TRUE),
+    `Less than HS (%)` = mean(education_level == 1, na.rm = TRUE) * 100,
+    `HS Graduate (%)` = mean(education_level == 2, na.rm = TRUE) * 100,
+    `Some College (%)` = mean(education_level == 3, na.rm = TRUE) * 100,
+    `College+ (%)` = mean(education_level == 4, na.rm = TRUE) * 100
+  ) %>%
+  mutate(Period = if_else(after1988 == 1, "Post-1988", "Pre-1988")) %>%
+  select(Period, everything(), -after1988)
+```
+
+
+```{r}
+# 2. Regression Models ----
+
+# Base model
+model1 <- lm(self_employed ~ female * after1988, data = data)
+
+# Model with controls
+model2 <- lm(self_employed ~ female * after1988 + 
+               factor(education_level) + 
+               AGE + I(AGE^2) +
+               factor(ethgroup), 
+             data = data)
+
+# Full model with interactions
+model3 <- lm(self_employed ~ female * after1988 * factor(education_level) + 
+               AGE + I(AGE^2) +
+               factor(ethgroup), 
+             data = data)
+```
+
+
+```{r}
+# Get robust standard errors
+library(sandwich)
+rob_se1 <- sqrt(diag(vcovHC(model1, type = "HC1")))
+rob_se2 <- sqrt(diag(vcovHC(model2, type = "HC1")))
+rob_se3 <- sqrt(diag(vcovHC(model3, type = "HC1")))
+```
+
+
+```{r}
+# Create regression tables
+# HTML version for RMarkdown
+stargazer(model1, model2, model3,
+          type = "html",
+          title = "Impact of ECOA on Female Self-Employment",
+          dep.var.labels = "Self-Employed",
+          covariate.labels = c("Female", "Post-1988", "Female × Post-1988",
+                              "High School", "Some College", "College+",
+                              "Age", "Age²"),
+          se = list(rob_se1, rob_se2, rob_se3),
+          digits = 3,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          omit.stat = c("f", "ser"),
+          add.lines = list(
+            c("Controls", "No", "Yes", "Yes"),
+            c("Education × Post-1988", "No", "No", "Yes")
+          ),
+          notes = "Robust standard errors in parentheses",
+          notes.append = FALSE)
+```
+
+
+```{r}
+# Text version for console
+stargazer(model1, model2, model3,
+          type = "text",
+          title = "Impact of ECOA on Female Self-Employment",
+          dep.var.labels = "Self-Employed",
+          covariate.labels = c("Female", "Post-1988", "Female × Post-1988",
+                              "High School", "Some College", "College+",
+                              "Age", "Age²"),
+          se = list(rob_se1, rob_se2, rob_se3),
+          digits = 3,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          omit.stat = ('f', 'seq')
+```
+
+```{r}
+stargazer(model1, model2, model3,
+          type = "text",
+          title = "Impact of ECOA on Female Self-Employment",
+          dep.var.labels = "Self-Employed",
+          covariate.labels = c("Female", "Post-1988", "Female × Post-1988",
+                              "High School", "Some College", "College+",
+                              "Age", "Age²"),
+          se = list(rob_se1, rob_se2, rob_se3),
+          digits = 3,
+          star.cutoffs = c(0.05, 0.01, 0.001),  # Comma added here
+          omit.stat = c(("f", "seq"))           # Use c() for multiple items
+
+```
+
+```{r}
+# 3. Save results to file ----
+sink("regression_results.html")
+
+# Print descriptive statistics
+cat("\nDescriptive Statistics - Overall Sample\n")
+print(kable(desc_stats, format = "pipe", digits = 2))
+
+cat("\nDescriptive Statistics by Gender\n")
+print(kable(desc_stats_by_gender, format = "pipe", digits = 2))
+
+cat("\nDescriptive Statistics by Time Period\n")
+print(kable(desc_stats_by_period, format = "pipe", digits = 2))
+
+# Print regression results
+cat("\nRegression Results\n")
+stargazer(model1, model2, model3,
+          type = "text",
+          title = "Impact of ECOA on Female Self-Employment",
+          dep.var.labels = "Self-Employed",
+          covariate.labels = c("Female", "Post-1988", "Female × Post-1988",
+                              "High School", "Some College", "College+",
+                              "Age", "Age²"),
+          se = list(rob_se1, rob_se2, rob_se3),
+          digits = 3,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          omit.stat = c("f", "ser"))
+
+sink()
+```
+```{r}
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+
+```{r}
+# 1. Education Effects Plot
+education_effects <- data.frame(
+  education = factor(c("High School", "Some College", "College+"),
+                    levels = c("High School", "Some College", "College+")),
+  base_effect = c(-0.007, -0.019, 0.010),             # From model2
+  female_int = c(0.003, 0.011, 0.018),                # From model3 female:education interactions
+  post_int = c(-0.019, -0.015, -0.032),               # From model3 after1988:education interactions
+  triple_int = c(0.005, 0.007, 0.012)                 # From model3 female:after1988:education interactions
+)
+```
+
+
+```{r}
+# Convert to long format
+education_long <- education_effects %>%
+  pivot_longer(cols = -education,
+               names_to = "effect_type",
+               values_to = "effect_size") %>%
+  mutate(effect_type = factor(effect_type,
+                             levels = c("base_effect", "female_int", "post_int", "triple_int"),
+                             labels = c("Base Effect", "Female Interaction",
+                                      "Post-1988 Effect", "Female × Post-1988 × Education")))
+```
+
+
+```{r}
+# Create education effects plot
+ggplot(education_long, aes(x = education, y = effect_size, fill = effect_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Effects of Education on Self-Employment",
+       subtitle = "Interaction Effects from Model 3",
+       x = "Education Level",
+       y = "Effect on Self-Employment (percentage points)",
+       fill = "Effect Type") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 100))
+
+# 2. Time Trend Plot (if you have the raw data)
+# Replace 'df' with your actual dataframe name
+time_effects <- data.frame(
+  period = c("Pre-1988", "Post-1988"),
+  male = c(0, -0.015),                    # Base + Post-1988 effect
+  female = c(-0.060, -0.060 - 0.015 + 0.016)  # Female effect + Post-1988 + interaction
+)
+
+# Convert to long format
+time_long <- time_effects %>%
+  pivot_longer(cols = c(male, female),
+               names_to = "gender",
+               values_to = "self_employment_rate")
+
+# Create time trend plot
+ggplot(time_long, aes(x = period, y = self_employment_rate, group = gender, color = gender)) +
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  scale_color_brewer(palette = "Set1") +
+  labs(title = "Changes in Self-Employment Rates Over Time",
+       subtitle = "By Gender, Pre and Post 1988",
+       x = "Time Period",
+       y = "Self-Employment Rate (relative to base)",
+       color = "Gender") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 100))
+
+# Save plots if needed
+ggsave("education_effects.png", width = 10, height = 6)
+ggsave("time_trends.png", width = 10, height = 6)
+```
+```{r}
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(scales)
+
+# Create a more comprehensive dataset with standard errors
+model_effects <- data.frame(
+    education = factor(c("No College", "High School", "Some College", "College+"),
+                      levels = c("No College", "High School", "Some College", "College+")),
+    estimate = c(0, -0.006, -0.009, 0.010),  # Base education effects
+    female_effect = c(0, 0.003, 0.011, 0.018),  # Additional effect for women
+    post_effect = c(0, -0.019, -0.015, -0.032)  # Post-1988 effect
+)
+
+# Calculate total effects
+model_effects <- model_effects %>%
+    mutate(
+        total_male_pre = estimate,
+        total_female_pre = estimate + female_effect,
+        total_male_post = estimate + post_effect,
+        total_female_post = estimate + female_effect + post_effect
+    )
+
+# Convert to long format for plotting
+plot_data <- model_effects %>%
+    select(education, total_male_pre, total_female_pre, total_male_post, total_female_post) %>%
+    pivot_longer(
+        cols = starts_with("total"),
+        names_to = "group",
+        values_to = "effect"
+    ) %>%
+    mutate(
+        Gender = ifelse(grepl("female", group), "Women", "Men"),
+        Period = ifelse(grepl("post", group), "Post-1988", "Pre-1988")
+    )
+
+# Create an enhanced plot
+ggplot(plot_data, aes(x = education, y = effect, fill = interaction(Gender, Period))) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+    scale_fill_manual(
+        values = c("Men.Pre-1988" = "#2E86C1",
+                  "Men.Post-1988" = "#85C1E9",
+                  "Women.Pre-1988" = "#E74C3C",
+                  "Women.Post-1988" = "#F5B7B1"),
+        name = "Gender and Time Period",
+        labels = c("Men (Pre-1988)", "Men (Post-1988)", 
+                  "Women (Pre-1988)", "Women (Post-1988)")
+    ) +
+    labs(
+        title = "Impact of Education on Self-Employment Rates",
+        subtitle = "By Gender and Time Period, Relative to No College Education",
+        x = "Education Level",
+        y = "Change in Self-Employment Probability"
+    ) +
+    scale_y_continuous(
+        labels = percent_format(accuracy = 0.1),
+        breaks = seq(-0.04, 0.02, by = 0.01)
+    ) +
+    theme_minimal() +
+    theme(
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(size = 12, hjust = 0.5),
+        axis.title = element_text(size = 11),
+        axis.text = element_text(size = 10),
+        legend.position = "bottom",
+        legend.title = element_text(size = 10),
+        legend.text = element_text(size = 9),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.border = element_rect(fill = NA, color = "gray80")
+    ) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    coord_cartesian(ylim = c(-0.04, 0.02))
+
+# Save the plot with high resolution
+ggsave("education_self_employment_effects.png", 
+       width = 12, 
+       height = 8, 
+       dpi = 300)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
